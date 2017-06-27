@@ -35,11 +35,11 @@ LightServer.prototype.writeLog = function (logLine) {
 
 LightServer.prototype.start = function () {
   var _this = this
-  if (!_this.options.serve && !_this.options.proxy) {
+  if (!_this.options.serve && !_this.options.proxy && !_this.options.noWatch) {
     _this.watch()
     return
   }
-
+  
   var app = connect()
   _this.lr = LR({
     quiet: _this.options.quiet,
@@ -48,15 +48,16 @@ LightServer.prototype.start = function () {
 
   !this.options.quiet && app.use(morgan('dev'))
   app.use(_this.lr.middleFunc)
-  app.use(injector(
-    function (req, res) {
-      return res.getHeader('content-type') && res.getHeader('content-type').indexOf('text/html') !== -1
-    },
+  if(!_this.options.noWatch)
+    app.use(injector(
+      function (req, res) {
+        return res.getHeader('content-type') && res.getHeader('content-type').indexOf('text/html') !== -1
+      },
 
-    function (data, req, res, callback) {
-      callback(null, data.toString().replace('</body>', '<script src="/__lightserver__/reload-client.js"></script></body>'))
-    })
-  )
+      function (data, req, res, callback) {
+        callback(null, data.toString().replace('</body>', '<script src="/__lightserver__/reload-client.js"></script></body>'))
+      })
+    )
 
   if (_this.options.serve) {
     app.use(serveStatic(_this.options.serve))
@@ -90,7 +91,7 @@ LightServer.prototype.start = function () {
 
     _this.writeLog('')
     _this.lr.startWS(server) // websocket shares same port with http
-    _this.watch()
+    if(!_this.options.noWatch) _this.watch()
   }).on('error', function (err) {
     if (err.errno === 'EADDRINUSE') {
       console.log('## ERROR: port ' + _this.options.port + ' is already in use')
